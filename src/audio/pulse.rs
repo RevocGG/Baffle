@@ -71,7 +71,7 @@ fn capture_loop(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
     use pulse::mainloop::standard::Mainloop;
     use pulse::sample::{Format, Spec};
     use pulse::stream::Stream;
-    use pulse::stream::{Direction, FlagSet as StreamFlags, PeekResult, State as StreamState};
+    use pulse::stream::{FlagSet as StreamFlags, PeekResult, State as StreamState};
 
     let mut mainloop = Mainloop::new().ok_or_else(|| anyhow!("PA mainloop"))?;
     let mut ctx = Context::new(&mut mainloop, "baffle").ok_or_else(|| anyhow!("PA context"))?;

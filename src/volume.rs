@@ -215,6 +215,7 @@ fn pump_windows() {
 
 #[cfg(target_os = "linux")]
 fn ksni_tray(cfg: Arc<RwLock<Config>>) -> Result<()> {
+    use anyhow::anyhow;
     use ksni::blocking::TrayMethods;
     use ksni::menu::*;
     use std::sync::mpsc;

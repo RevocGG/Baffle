@@ -239,10 +239,10 @@ unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
         }
     });
     SCShareableContent::getShareableContentWithCompletionHandler(&store);
-    let content: Retained<SCShareableContent> =
-        crx.recv()
-            .map_err(|_| anyhow!("SCK handler closed"))??
-            .ok_or_else(|| anyhow!("SCK content was null"))?;
+    let content: Retained<SCShareableContent> = crx
+        .recv()
+        .map_err(|_| anyhow!("SCK handler closed"))??
+        .ok_or_else(|| anyhow!("SCK content was null"))?;
 
     let Some(display) = content.displays().firstObject() else {
         return Err(anyhow!("SCK: no displays"));
