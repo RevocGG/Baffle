@@ -50,7 +50,10 @@ fn real_main(cfg: &Arc<RwLock<crate::config::Config>>, tel: &SharedTelemetry) ->
     Ok(())
 }
 
-fn wait_for<F: Fn() -> Option<bool>>(mainloop: &mut pulse::mainloop::standard::Mainloop, done: F) -> Result<()> {
+fn wait_for<F: Fn() -> Option<bool>>(
+    mainloop: &mut pulse::mainloop::standard::Mainloop,
+    done: F,
+) -> Result<()> {
     for _ in 0..5000 {
         mainloop.iterate(false);
         if let Some(true) = done() {
@@ -67,8 +70,8 @@ fn capture_loop(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
     use pulse::context::{Context, FlagSet as CtxFlags, State as CtxState};
     use pulse::mainloop::standard::Mainloop;
     use pulse::sample::{Format, Spec};
-    use pulse::stream::{Direction, FlagSet as StreamFlags, PeekResult, State as StreamState};
     use pulse::stream::Stream;
+    use pulse::stream::{Direction, FlagSet as StreamFlags, PeekResult, State as StreamState};
 
     let mut mainloop = Mainloop::new().ok_or_else(|| anyhow!("PA mainloop"))?;
     let mut ctx = Context::new(&mut mainloop, "baffle").ok_or_else(|| anyhow!("PA context"))?;
@@ -89,11 +92,15 @@ fn capture_loop(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
         srx.recv_timeout(std::time::Duration::from_secs(5))?
     };
 
-    let spec = Spec { format: Format::F32le, channels: 2, rate: 44_100 };
+    let spec = Spec {
+        format: Format::F32le,
+        channels: 2,
+        rate: 44_100,
+    };
     assert!(spec.is_valid());
 
-    let mut stream = Stream::new(&mut ctx, "baffle-monitor", &spec, None)
-        .ok_or_else(|| anyhow!("PA stream"))?;
+    let mut stream =
+        Stream::new(&mut ctx, "baffle-monitor", &spec, None).ok_or_else(|| anyhow!("PA stream"))?;
     stream
         .connect_record(
             Some(&format!("{sink_name}.monitor")),
@@ -182,7 +189,11 @@ fn dsp_and_apply_loop(
                     user_base = implied_base.clamp(0.0, 1.0);
                 }
 
-                let action_db = if engine.enabled { engine.tel.read().action_db } else { 0.0 };
+                let action_db = if engine.enabled {
+                    engine.tel.read().action_db
+                } else {
+                    0.0
+                };
                 let new_vol = actuator.update(action_db, user_base, APPLY_PERIOD.as_secs_f32());
                 p.set_sink_volume(new_vol);
             } else {
@@ -266,21 +277,29 @@ impl PaCtl {
     }
 
     fn get_sink_volume(&self) -> f32 {
-        let Some(sink) = self.default_sink() else { return 0.6 };
+        let Some(sink) = self.default_sink() else {
+            return 0.6;
+        };
         let (tx, rx) = mpsc::channel::<f32>();
         unsafe {
-            (*self.context).introspect().get_sink_info_by_name(&sink, move |info| {
-                let v = info.volume.avg().0 as f32 / PA_NORM;
-                let _ = tx.send(v.clamp(0.0, 1.0));
-            });
+            (*self.context)
+                .introspect()
+                .get_sink_info_by_name(&sink, move |info| {
+                    let v = info.volume.avg().0 as f32 / PA_NORM;
+                    let _ = tx.send(v.clamp(0.0, 1.0));
+                });
         }
-        let v = rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or(0.6);
+        let v = rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap_or(0.6);
         self.drain();
         v
     }
 
     fn set_sink_volume(&self, vol: f32) {
-        let Some(sink) = self.default_sink() else { return };
+        let Some(sink) = self.default_sink() else {
+            return;
+        };
         use pulse::volume::{ChannelVolumes, Volume};
         let mut cv = ChannelVolumes::default();
         cv.set(2, Volume((vol.clamp(0.0, 1.0) * PA_NORM) as u32));

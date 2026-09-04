@@ -19,7 +19,10 @@ pub struct VolumeActuator {
 
 impl VolumeActuator {
     pub fn new() -> Self {
-        Self { current: f32::NAN, slew_per_s: 1.2 }
+        Self {
+            current: f32::NAN,
+            slew_per_s: 1.2,
+        }
     }
     /// `delta_db` — controller action; `user_base` — user-chosen volume.
     pub fn update(&mut self, delta_db: f32, user_base: f32, dt: f32) -> f32 {
@@ -104,9 +107,9 @@ pub fn db_to_lin(db: f32) -> f32 {
     (10.0f32).powf(db / 20.0)
 }
 
-#[cfg(target_os = "windows")]
-pub mod win;
 #[cfg(target_os = "macos")]
 pub mod mac;
 #[cfg(target_os = "linux")]
 pub mod pulse;
+#[cfg(target_os = "windows")]
+pub mod win;

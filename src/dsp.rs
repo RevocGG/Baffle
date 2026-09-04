@@ -189,7 +189,11 @@ impl Analyzer {
         };
 
         // Fast loudness envelope with attack/release.
-        let tc = if loud > self.fast { FAST_ATTACK_S } else { FAST_RELEASE_S };
+        let tc = if loud > self.fast {
+            FAST_ATTACK_S
+        } else {
+            FAST_RELEASE_S
+        };
         let a = (-dt / tc).exp();
         self.fast = loud + a * (self.fast - loud);
 
@@ -255,7 +259,11 @@ impl Analyzer {
         for i in 0..BANDS {
             let speech = i == 2 || i == 3;
             let shape = if total >= 0.0 {
-                if speech { 1.2 } else { 0.75 }
+                if speech {
+                    1.2
+                } else {
+                    0.75
+                }
             } else if speech {
                 0.85
             } else {

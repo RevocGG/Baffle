@@ -1,6 +1,9 @@
 // Hide the console window on Windows release builds so launching the exe
 // shows only the Baffle window (debug builds keep the console for logs).
-#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
 
 use anyhow::Result;
 use parking_lot::RwLock;
@@ -43,8 +46,7 @@ pub type SharedTelemetry = Arc<RwLock<Telemetry>>;
 pub static SHUTDOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Acknowledged by the engine after it restored the volume (or it never will
 /// if the engine already died); main waits for it before exiting.
-pub static SHUTDOWN_DONE: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+pub static SHUTDOWN_DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(windows)]
 mod single_instance {

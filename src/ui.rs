@@ -117,8 +117,14 @@ fn load_system_fonts(ctx: &egui::Context) {
     ];
     #[cfg(all(unix, not(target_os = "macos")))]
     let candidates: &[(&str, &str)] = &[
-        ("sys-regular", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        ("sys-bold", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        (
+            "sys-regular",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ),
+        (
+            "sys-bold",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ),
     ];
 
     for (name, path) in candidates {
@@ -369,7 +375,12 @@ impl BaffleApp {
         let radius = egui::CornerRadius::same(20);
 
         painter.rect_filled(rect, radius, INSET);
-        painter.rect_stroke(rect, radius, egui::Stroke::new(1.0_f32, BORDER), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            rect,
+            radius,
+            egui::Stroke::new(1.0_f32, BORDER),
+            egui::StrokeKind::Inside,
+        );
 
         let position = ui.ctx().animate_value_with_time(
             egui::Id::new("baffle_state_indicator"),
@@ -462,9 +473,15 @@ impl BaffleApp {
 
                 let (dot_rect, _) =
                     ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-                ui.painter().circle_filled(dot_rect.center(), 4.0, status_color);
+                ui.painter()
+                    .circle_filled(dot_rect.center(), 4.0, status_color);
                 ui.add_space(8.0);
-                ui.label(egui::RichText::new(status).size(text_size(13.0)).strong().color(TEXT));
+                ui.label(
+                    egui::RichText::new(status)
+                        .size(text_size(13.0))
+                        .strong()
+                        .color(TEXT),
+                );
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if enabled && tel.action_db.abs() > 0.05 {
@@ -557,7 +574,12 @@ impl BaffleApp {
             );
             x += 18.0;
         }
-        target_badge(&painter, plot.right() - 8.0, target_y, &format!("{target_db:.0} dB"));
+        target_badge(
+            &painter,
+            plot.right() - 8.0,
+            target_y,
+            &format!("{target_db:.0} dB"),
+        );
 
         // Smooth the live five-band profile so it reads as an instrument, not
         // a jittery diagnostic. Paused audio settles to the meter floor.
@@ -626,13 +648,11 @@ impl BaffleApp {
             }
 
             if enabled && self.peaks[i] > METER_FLOOR_DB + 1.0 {
-                let peak_amount = ((self.peaks[i] - METER_FLOOR_DB) / -METER_FLOOR_DB).clamp(0.0, 1.0);
+                let peak_amount =
+                    ((self.peaks[i] - METER_FLOOR_DB) / -METER_FLOOR_DB).clamp(0.0, 1.0);
                 let peak_y = indicator_bottom - indicator_height * peak_amount;
                 painter.line_segment(
-                    [
-                        egui::pos2(cx - 6.0, peak_y),
-                        egui::pos2(cx + 6.0, peak_y),
-                    ],
+                    [egui::pos2(cx - 6.0, peak_y), egui::pos2(cx + 6.0, peak_y)],
                     egui::Stroke::new(1.0_f32, TEXT),
                 );
             }

@@ -61,7 +61,8 @@ mod mac_tray_state {
         use tray_icon::menu::{CheckMenuItem, Menu, MenuItem};
         use tray_icon::TrayIconBuilder;
 
-        let enable_item = CheckMenuItem::with_id("enable", "Enabled", true, cfg.read().enabled, None);
+        let enable_item =
+            CheckMenuItem::with_id("enable", "Enabled", true, cfg.read().enabled, None);
         let show_item = MenuItem::with_id("show", "Show window", true, None);
         let quit_item = MenuItem::with_id("quit", "Quit", true, None);
         let menu = Menu::new();
@@ -93,7 +94,9 @@ mod mac_tray_state {
     /// Called from the UI loop each frame (main thread).
     pub fn poll_menu_events() {
         TRAY.with(|slot| {
-            let Some(state) = slot.borrow().as_ref() else { return };
+            let Some(state) = slot.borrow().as_ref() else {
+                return;
+            };
             while let Ok(ev) = tray_icon::menu::MenuEvent::receiver().try_recv() {
                 match ev.id().0.as_str() {
                     "enable" => {
@@ -211,8 +214,8 @@ fn pump_windows() {
 
 #[cfg(target_os = "linux")]
 fn ksni_tray(cfg: Arc<RwLock<Config>>) -> Result<()> {
-    use ksni::menu::*;
     use ksni::blocking::TrayMethods;
+    use ksni::menu::*;
     use std::sync::mpsc;
 
     struct BaffleTray {

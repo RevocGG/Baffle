@@ -14,8 +14,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
-use windows::Win32::Media::Audio::{eConsole, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator};
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+use windows::Win32::Media::Audio::{
+    eConsole, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
+};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+};
 
 const ANALYSIS_SR: usize = 48_000;
 const ANALYSIS_CH: usize = 2;
@@ -53,8 +57,9 @@ fn real_main(cfg: &Arc<RwLock<crate::config::Config>>, tel: &SharedTelemetry) ->
         let dev: IMMDevice = enumr
             .GetDefaultAudioEndpoint(eRender, eConsole)
             .map_err(|e| anyhow!("GetDefaultAudioEndpoint: {e}"))?;
-        let endpoint_volume: IAudioEndpointVolume =
-            dev.Activate(CLSCTX_ALL, None).map_err(|e| anyhow!("Activate volume: {e}"))?;
+        let endpoint_volume: IAudioEndpointVolume = dev
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| anyhow!("Activate volume: {e}"))?;
 
         loop {
             let r = capture_session(
@@ -85,7 +90,9 @@ fn capture_session(
 ) -> Result<()> {
     use wasapi::*;
 
-    initialize_mta().ok().map_err(|e| anyhow!("wasapi MTA: {e}"))?;
+    initialize_mta()
+        .ok()
+        .map_err(|e| anyhow!("wasapi MTA: {e}"))?;
     let enumerator = DeviceEnumerator::new()?;
     let device = enumerator.get_default_device(&Direction::Render)?;
     let mut audio_client = device.get_iaudioclient()?;
@@ -108,7 +115,8 @@ fn capture_session(
     let ch = ANALYSIS_CH;
     {
         let c = cfg.read();
-        engine.analyzer = crate::dsp::Analyzer::new(sr as u32, ANALYSIS_CH as u16, c.target_loudness, c.strength);
+        engine.analyzer =
+            crate::dsp::Analyzer::new(sr as u32, ANALYSIS_CH as u16, c.target_loudness, c.strength);
     }
     log::info!("loopback capture started: {sr} Hz, {ch} ch (autoconverted)");
 
@@ -157,13 +165,19 @@ fn capture_session(
             // our own previous write, the base is unchanged.
             let now_vol = get_endpoint_volume(endpoint_volume);
             if !last_written.is_nan() && (now_vol - last_written).abs() > 0.01 {
-                log::debug!("external volume change detected: {now_vol:.3} (was {last_written:.3})");
+                log::debug!(
+                    "external volume change detected: {now_vol:.3} (was {last_written:.3})"
+                );
                 user_base = now_vol;
                 actuator.current = now_vol;
             }
             last_written = now_vol; // after adoption, we "own" this value
 
-            let action_db = if engine.enabled { engine.tel.read().action_db } else { 0.0 };
+            let action_db = if engine.enabled {
+                engine.tel.read().action_db
+            } else {
+                0.0
+            };
 
             // 1 Hz telemetry trace (debug builds / RUST_LOG=debug).
             if last_tel_log.elapsed() >= Duration::from_secs(1) {
@@ -206,7 +220,11 @@ fn pack_floats(queue: &mut std::collections::VecDeque<u8>, n: usize, out: &mut [
 }
 
 fn get_endpoint_volume(v: &IAudioEndpointVolume) -> f32 {
-    unsafe { v.GetMasterVolumeLevelScalar().unwrap_or(0.5).clamp(0.0, 1.0) }
+    unsafe {
+        v.GetMasterVolumeLevelScalar()
+            .unwrap_or(0.5)
+            .clamp(0.0, 1.0)
+    }
 }
 
 fn set_endpoint_volume(v: &IAudioEndpointVolume, vol: f32) -> Result<()> {

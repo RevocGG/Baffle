@@ -53,4 +53,3 @@ pub fn icon_rgba() -> Vec<u8> {
 
 pub const ICON_W: u32 = S as u32;
 pub const ICON_H: u32 = S as u32;
-

@@ -17,11 +17,12 @@ use objc2::ClassType;
 use objc2_core_audio::{
     kAudioDevicePropertyScopeOutput, kAudioDevicePropertyVolumeScalar,
     kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyElementMaster,
-    kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, AudioObjectID,
-    AudioObjectGetPropertyData, AudioObjectSetPropertyData, AudioObjectPropertyAddress,
+    kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, AudioObjectGetPropertyData,
+    AudioObjectID, AudioObjectPropertyAddress, AudioObjectSetPropertyData,
 };
 use objc2_core_foundation::CFRunLoop;
 use objc2_core_media::{CMSampleBuffer, CMTimeMake};
+use objc2_foundation::{NSError, NSObjectProtocol};
 use objc2_screen_capture_kit::{
     SCContentFilter, SCShareableContent, SCStream, SCStreamConfiguration, SCStreamOutput,
     SCStreamOutputType,
@@ -71,7 +72,11 @@ unsafe fn get_default_output_volume(dev: AudioObjectID) -> f32 {
         &mut size as *mut u32,
         &mut vol as *mut f32 as *mut core::ffi::c_void,
     );
-    if status == 0 { vol.clamp(0.0, 1.0) } else { 0.5 }
+    if status == 0 {
+        vol.clamp(0.0, 1.0)
+    } else {
+        0.5
+    }
 }
 
 unsafe fn set_default_output_volume(dev: AudioObjectID, vol: f32) {
@@ -129,13 +134,15 @@ unsafe fn handle_sample(
     sb: &CMSampleBuffer,
     of_type: SCStreamOutputType,
 ) {
-    if of_type != SCStreamOutputTypeAudio {
+    if of_type != SCStreamOutputType::Audio {
         return;
     }
     if sb.num_samples() <= 0 || !sb.data_ready() {
         return;
     }
-    let Some(block) = sb.data_buffer() else { return };
+    let Some(block) = sb.data_buffer() else {
+        return;
+    };
     let len = block.data_length() as usize;
     if len == 0 {
         return;
@@ -201,9 +208,15 @@ fn real_main(cfg: &Arc<RwLock<crate::config::Config>>, tel: &SharedTelemetry) ->
 
 unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
     let (ready_tx, ready_rx) = mpsc::channel::<Result<()>>();
-    let ready = RcBlock::new(move |_content: *mut SCShareableContent, err: *mut NSError| {
-        let _ = ready_tx.send(if err.is_null() { Ok(()) } else { Err(anyhow!("SCK denied")) });
-    });
+    let ready = RcBlock::new(
+        move |_content: *mut SCShareableContent, err: *mut NSError| {
+            let _ = ready_tx.send(if err.is_null() {
+                Ok(())
+            } else {
+                Err(anyhow!("SCK denied"))
+            });
+        },
+    );
     SCShareableContent::getShareableContentWithCompletionHandler(&ready);
     ready_rx
         .recv()
@@ -244,18 +257,14 @@ unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
     // Audio-only interest: slow video pacing (audio is unaffected).
     sck_cfg.setMinimumFrameInterval(CMTimeMake(1, 10));
 
-    let stream = SCStream::initWithFilter_configuration_delegate(
-        SCStream::alloc(),
-        &filter,
-        &sck_cfg,
-        None,
-    );
+    let stream =
+        SCStream::initWithFilter_configuration_delegate(SCStream::alloc(), &filter, &sck_cfg, None);
     let output = StreamOutput::new(tx);
     let queue = dispatch2::DispatchQueue::new("baffle-audio", None);
     stream
         .addStreamOutput_type_sampleHandlerQueue_error(
             ProtocolObject::from_retained(output),
-            SCStreamOutputTypeAudio,
+            SCStreamOutputType::Audio,
             Some(&queue),
         )
         .map_err(|e| anyhow!("addStreamOutput: {e}"))?;
@@ -312,7 +321,11 @@ fn dsp_and_apply_loop(
                 user_base = implied_base.clamp(0.0, 1.0);
             }
 
-            let action_db = if engine.enabled { engine.tel.read().action_db } else { 0.0 };
+            let action_db = if engine.enabled {
+                engine.tel.read().action_db
+            } else {
+                0.0
+            };
             let new_vol = actuator.update(action_db, user_base, APPLY_PERIOD.as_secs_f32());
             unsafe { set_default_output_volume(dev, new_vol) };
         }
