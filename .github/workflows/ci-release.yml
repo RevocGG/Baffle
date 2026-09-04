@@ -1,0 +1,290 @@
+name: CI and releases
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baffle-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  quality:
+    name: Format, check, and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+          components: rustfmt
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libdbus-1-dev \
+            libegl1-mesa-dev \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            libpulse-dev \
+            libwayland-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-render-util0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            pkg-config
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Typecheck all targets
+        run: cargo check --locked --all-targets
+
+      - name: Run tests
+        run: cargo test --locked --all-targets --features no-engine
+
+  build-windows:
+    name: Build Windows release
+    runs-on: windows-latest
+    steps:
+      - name: Configure Git line endings
+        shell: pwsh
+        run: git config --global core.autocrlf input
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install MinGW toolchain
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+
+      - name: Add MinGW to PATH
+        shell: pwsh
+        env:
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+        run: echo "$env:MSYS2_LOCATION\mingw64\bin" >> $env:GITHUB_PATH
+
+      - name: Install Rust GNU 1.85
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0-x86_64-pc-windows-gnu
+
+      - name: Select Rust GNU toolchain
+        shell: pwsh
+        run: rustup default 1.85.0-x86_64-pc-windows-gnu
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Windows target
+        shell: msys2 {0}
+        run: cargo check --locked --all-targets
+
+      - name: Run Windows tests
+        shell: msys2 {0}
+        run: cargo test --locked --all-targets --features no-engine
+
+      - name: Build Windows release
+        shell: msys2 {0}
+        run: bash scripts/build-windows.sh
+
+      - name: Package Windows release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive `
+            -Path target/release/baffle.exe, README.md `
+            -DestinationPath dist/baffle-windows-x86_64.zip `
+            -CompressionLevel Optimal
+          $hash = (Get-FileHash dist/baffle-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  baffle-windows-x86_64.zip" | Set-Content dist/SHA256SUMS-windows.txt -Encoding ascii
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baffle-windows-x86_64
+          path: |
+            dist/baffle-windows-x86_64.zip
+            dist/SHA256SUMS-windows.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux:
+    name: Build Linux release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libdbus-1-dev \
+            libegl1-mesa-dev \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            libpulse-dev \
+            libwayland-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-render-util0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            pkg-config
+
+      - name: Install Rust 1.85
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Linux target
+        run: cargo check --locked --all-targets
+
+      - name: Run Linux tests
+        run: cargo test --locked --all-targets --features no-engine
+
+      - name: Build Linux release
+        run: cargo build --locked --release
+
+      - name: Package Linux release
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp target/release/baffle dist/package/baffle
+          cp README.md dist/package/README.md
+          tar -czf dist/baffle-linux-x86_64.tar.gz -C dist/package baffle README.md
+          sha256sum dist/baffle-linux-x86_64.tar.gz > dist/SHA256SUMS-linux.txt
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baffle-linux-x86_64
+          path: |
+            dist/baffle-linux-x86_64.tar.gz
+            dist/SHA256SUMS-linux.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  build-macos:
+    name: Build macOS universal release
+    runs-on: macos-15
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Install universal targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check macOS target
+        run: cargo check --locked --all-targets
+
+      - name: Run macOS tests
+        run: cargo test --locked --all-targets --features no-engine
+
+      - name: Build macOS universal release
+        run: bash scripts/build-macos.sh
+
+      - name: Verify macOS universal binary
+        run: |
+          test -f target/baffle-universal
+          lipo -info target/baffle-universal | grep -Eq 'x86_64.*arm64|arm64.*x86_64'
+
+      - name: Package macOS release
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp target/baffle-universal dist/package/baffle
+          cp README.md dist/package/README.md
+          tar -czf dist/baffle-macos-universal.tar.gz -C dist/package baffle README.md
+          shasum -a 256 dist/baffle-macos-universal.tar.gz > dist/SHA256SUMS-macos.txt
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baffle-macos-universal
+          path: |
+            dist/baffle-macos-universal.tar.gz
+            dist/SHA256SUMS-macos.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish tagged release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - quality
+      - build-windows
+      - build-linux
+      - build-macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten release files
+        run: |
+          set -euo pipefail
+          find dist -mindepth 2 -type f -print0 | while IFS= read -r -d '' file; do
+            mv "$file" "dist/$(basename "$file")"
+          done
+          find dist -mindepth 1 -type d -empty -delete
+          find dist -maxdepth 1 -type f -print | sort
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Baffle $GITHUB_REF_NAME" \
+            --generate-notes

@@ -1,0 +1,27 @@
+#define IDI_BAFFLE 1
+IDI_BAFFLE ICON "icon.ico"
+
+1 VERSIONINFO
+FILEVERSION     0,1,0,0
+PRODUCTVERSION  0,1,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName",      "Baffle"
+      VALUE "FileDescription",  "Baffle - smart adaptive loudness for movies"
+      VALUE "FileVersion",      "0.1.0"
+      VALUE "InternalName",     "baffle"
+      VALUE "OriginalFilename", "baffle.exe"
+      VALUE "ProductName",      "Baffle"
+      VALUE "ProductVersion",   "0.1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
+
+1 24 "baffle.manifest"

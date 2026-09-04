@@ -1,0 +1,38 @@
+# Rust/Cargo build outputs
+/target/
+
+# Local production packages and copied binaries
+/dist/
+/release/
+/artifacts/
+/baffle.exe
+/*.msi
+/*.zip
+/*.dmg
+/*.AppImage
+
+# Local app state and Freebuff workspace metadata
+baffle-config.json
+.freebuff/
+.cargo/
+
+# Optional machine-specific Windows build toolchains
+/tools/localbin/
+/tools/mingw64/
+/tools/mingw-libs/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.pdb
+*.dSYM/
