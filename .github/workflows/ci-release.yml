@@ -24,10 +24,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install Rust 1.85
+      - name: Install Rust 1.88
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.88.0
           components: rustfmt
 
       - name: Install Linux build dependencies
@@ -91,14 +91,14 @@ jobs:
           MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
         run: echo "$env:MSYS2_LOCATION\mingw64\bin" >> $env:GITHUB_PATH
 
-      - name: Install Rust GNU 1.85
+      - name: Install Rust GNU 1.88
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0-x86_64-pc-windows-gnu
+          toolchain: 1.88.0-x86_64-pc-windows-gnu
 
       - name: Select Rust GNU toolchain
         shell: pwsh
-        run: rustup default 1.85.0-x86_64-pc-windows-gnu
+        run: rustup default 1.88.0-x86_64-pc-windows-gnu
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -165,10 +165,10 @@ jobs:
             libxkbcommon-x11-dev \
             pkg-config
 
-      - name: Install Rust 1.85
+      - name: Install Rust 1.88
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.88.0
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -210,10 +210,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install Rust 1.85
+      - name: Install Rust 1.88
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.88.0
 
       - name: Install universal targets
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin

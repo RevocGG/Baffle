@@ -2,7 +2,7 @@
 name = "baffle"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Smart adaptive loudness for movies: keeps quiet dialogue audible and tames loud explosions."
 license = "MIT"
 
