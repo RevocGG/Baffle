@@ -119,18 +119,24 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/baffle.exe dist/baffle-windows-x86_64-portable.exe
           Compress-Archive `
             -Path target/release/baffle.exe, README.md `
             -DestinationPath dist/baffle-windows-x86_64.zip `
             -CompressionLevel Optimal
-          $hash = (Get-FileHash dist/baffle-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  baffle-windows-x86_64.zip" | Set-Content dist/SHA256SUMS-windows.txt -Encoding ascii
+          $zipHash = (Get-FileHash dist/baffle-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          $exeHash = (Get-FileHash dist/baffle-windows-x86_64-portable.exe -Algorithm SHA256).Hash.ToLower()
+          @(
+            "$zipHash  baffle-windows-x86_64.zip"
+            "$exeHash  baffle-windows-x86_64-portable.exe"
+          ) | Set-Content dist/SHA256SUMS-windows.txt -Encoding ascii
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: baffle-windows-x86_64
           path: |
+            dist/baffle-windows-x86_64-portable.exe
             dist/baffle-windows-x86_64.zip
             dist/SHA256SUMS-windows.txt
           if-no-files-found: error
