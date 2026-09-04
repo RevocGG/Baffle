@@ -36,7 +36,7 @@ static SAMPLE_CH: AtomicU64 = AtomicU64::new(2);
 
 unsafe fn default_output_device() -> Result<AudioObjectID> {
     let mut size = std::mem::size_of::<AudioObjectID>() as u32;
-    let mut dev = AudioObjectID(0);
+    let mut dev: AudioObjectID = 0;
     let addr = AudioObjectPropertyAddress {
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
         mScope: kAudioObjectPropertyScopeOutput,
