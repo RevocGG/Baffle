@@ -255,7 +255,7 @@ fn ksni_tray(cfg: Arc<RwLock<Config>>) -> Result<()> {
         fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
             let enabled = self.cfg.read().enabled;
             vec![
-                CheckMenuItem {
+                CheckmarkItem {
                     label: "Enabled".into(),
                     checked: enabled,
                     activate: Box::new(|tray: &mut Self| {

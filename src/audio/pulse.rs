@@ -87,7 +87,12 @@ fn capture_loop(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
         let introspector = ctx.introspect();
         let (stx, srx) = mpsc::channel::<String>();
         introspector.get_server_info(move |info| {
-            let _ = stx.send(info.default_sink_name.clone().unwrap_or_default());
+            let name = info
+                .default_sink_name
+                .as_deref()
+                .unwrap_or_default()
+                .to_string();
+            let _ = stx.send(name);
         });
         srx.recv_timeout(std::time::Duration::from_secs(5))?
     };
@@ -114,7 +119,9 @@ fn capture_loop(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
         _ => None,
     })?;
 
-    let ss = stream.get_sample_spec();
+    let ss = stream
+        .get_sample_spec()
+        .ok_or_else(|| anyhow!("PA sample spec unavailable"))?;
     log::info!(
         "PA monitor capture started: {} Hz, {} ch ({sink_name}.monitor)",
         ss.rate,
@@ -268,7 +275,12 @@ impl PaCtl {
         let (tx, rx) = mpsc::channel::<String>();
         unsafe {
             (*self.context).introspect().get_server_info(move |info| {
-                let _ = tx.send(info.default_sink_name.clone().unwrap_or_default());
+                let name = info
+                    .default_sink_name
+                    .as_deref()
+                    .unwrap_or_default()
+                    .to_string();
+                let _ = tx.send(name);
             });
         }
         let name = rx.recv_timeout(std::time::Duration::from_secs(2)).ok()?;
@@ -285,8 +297,10 @@ impl PaCtl {
             (*self.context)
                 .introspect()
                 .get_sink_info_by_name(&sink, move |info| {
-                    let v = info.volume.avg().0 as f32 / PA_NORM;
-                    let _ = tx.send(v.clamp(0.0, 1.0));
+                    if let pulse::callbacks::ListResult::Item(info) = info {
+                        let v = info.volume.avg().0 as f32 / PA_NORM;
+                        let _ = tx.send(v.clamp(0.0, 1.0));
+                    }
                 });
         }
         let v = rx

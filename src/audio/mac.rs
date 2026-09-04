@@ -274,10 +274,11 @@ unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
             log::error!("SCK startCapture failed");
         }
     });
-    stream.startCaptureWithCompletionHandler(&started);
+    stream.startCaptureWithCompletionHandler(Some(&started));
 
     log::info!("ScreenCaptureKit audio tap started");
     CFRunLoop::run(); // park this thread servicing SCK callbacks
+    Ok(())
 }
 
 fn dsp_and_apply_loop(
@@ -288,8 +289,7 @@ fn dsp_and_apply_loop(
     let mut engine = Engine::new(cfg.clone(), tel.clone());
     let mut actuator = VolumeActuator::new();
     let mut last_apply = std::time::Instant::now();
-    let mut user_base =
-        unsafe { get_default_output_volume(default_output_device().unwrap_or(AudioObjectID(0))) };
+    let mut user_base = unsafe { get_default_output_volume(default_output_device().unwrap_or(0)) };
 
     loop {
         if crate::SHUTDOWN.load(std::sync::atomic::Ordering::Relaxed) {
@@ -310,7 +310,7 @@ fn dsp_and_apply_loop(
             last_apply = std::time::Instant::now();
             engine.sync_settings();
 
-            let dev = unsafe { default_output_device().unwrap_or(AudioObjectID(0)) };
+            let dev = unsafe { default_output_device().unwrap_or(0) };
             let now_vol = unsafe { get_default_output_volume(dev) };
             let implied_base = if actuator.current > 0.05 {
                 now_vol / actuator.current
@@ -331,7 +331,7 @@ fn dsp_and_apply_loop(
         }
     }
 
-    let dev = unsafe { default_output_device().unwrap_or(AudioObjectID(0)) };
+    let dev = unsafe { default_output_device().unwrap_or(0) };
     unsafe { set_default_output_volume(dev, user_base) };
     crate::SHUTDOWN_DONE.store(true, std::sync::atomic::Ordering::Relaxed);
 }
