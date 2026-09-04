@@ -11,9 +11,9 @@ use anyhow::{anyhow, Result};
 use block2::RcBlock;
 use objc2::define_class;
 use objc2::msg_send;
-use objc2::rc::{Allocated, Retained};
+use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::ClassType;
+use objc2::{AnyThread, DefinedClass};
 use objc2_core_audio::{
     kAudioDevicePropertyScopeOutput, kAudioDevicePropertyVolumeScalar,
     kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyElementMaster,
@@ -28,6 +28,7 @@ use objc2_screen_capture_kit::{
     SCStreamOutputType,
 };
 use parking_lot::RwLock;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 
@@ -43,12 +44,12 @@ unsafe fn default_output_device() -> Result<AudioObjectID> {
         mElement: kAudioObjectPropertyElementMaster,
     };
     let status = AudioObjectGetPropertyData(
-        kAudioObjectSystemObject,
-        &addr as *const AudioObjectPropertyAddress,
+        kAudioObjectSystemObject as AudioObjectID,
+        NonNull::from(&addr),
         0,
         std::ptr::null(),
-        &mut size as *mut u32,
-        &mut dev as *mut AudioObjectID as *mut core::ffi::c_void,
+        NonNull::from(&mut size),
+        NonNull::from(&mut dev).cast(),
     );
     if status != 0 {
         return Err(anyhow!("default_output_device: {status}"));
@@ -66,11 +67,11 @@ unsafe fn get_default_output_volume(dev: AudioObjectID) -> f32 {
     let mut size = std::mem::size_of::<f32>() as u32;
     let status = AudioObjectGetPropertyData(
         dev,
-        &addr as *const AudioObjectPropertyAddress,
+        NonNull::from(&addr),
         0,
         std::ptr::null(),
-        &mut size as *mut u32,
-        &mut vol as *mut f32 as *mut core::ffi::c_void,
+        NonNull::from(&mut size),
+        NonNull::from(&mut vol).cast(),
     );
     if status == 0 {
         vol.clamp(0.0, 1.0)
@@ -87,11 +88,11 @@ unsafe fn set_default_output_volume(dev: AudioObjectID, vol: f32) {
     };
     AudioObjectSetPropertyData(
         dev,
-        &addr as *const AudioObjectPropertyAddress,
+        NonNull::from(&addr),
         0,
         std::ptr::null(),
         std::mem::size_of::<f32>() as u32,
-        &vol as *const f32 as *const core::ffi::c_void,
+        NonNull::from(&vol).cast(),
     );
 }
 
@@ -105,10 +106,12 @@ define_class!(
     // SAFETY: NSObject has no subclassing requirements; we do not implement Drop.
     #[unsafe(super(NSObject))]
     #[name = "BaffleStreamOutput"]
+    #[ivars = Ivars]
     struct StreamOutput;
 
     // SAFETY: we fully implement the (optional) protocol method we use.
     unsafe impl SCStreamOutput for StreamOutput {
+        #[unsafe(method(stream:didOutputSampleBuffer:ofType:))]
         unsafe fn stream_didOutputSampleBuffer_ofType(
             &self,
             _stream: &SCStream,
@@ -137,7 +140,7 @@ unsafe fn handle_sample(
     if of_type != SCStreamOutputType::Audio {
         return;
     }
-    if sb.num_samples() <= 0 || !sb.data_ready() {
+    if sb.num_samples() <= 0 || !sb.data_is_ready() {
         return;
     }
     let Some(block) = sb.data_buffer() else {
@@ -148,7 +151,10 @@ unsafe fn handle_sample(
         return;
     }
     let mut buf = vec![0u8; len];
-    if block.copy_data_bytes(0, len, buf.as_mut_ptr().into()).0 != 0 {
+    let Some(destination) = NonNull::new(buf.as_mut_ptr().cast()) else {
+        return;
+    };
+    if block.copy_data_bytes(0, len, destination) != 0 {
         return;
     }
     let floats: Vec<f32> = buf
@@ -234,9 +240,11 @@ unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
     });
     SCShareableContent::getShareableContentWithCompletionHandler(&store);
     let content: Retained<SCShareableContent> =
-        crx.recv().map_err(|_| anyhow!("SCK handler closed"))??;
+        crx.recv()
+            .map_err(|_| anyhow!("SCK handler closed"))??
+            .ok_or_else(|| anyhow!("SCK content was null"))?;
 
-    let Some(display) = content.displays().first() else {
+    let Some(display) = content.displays().firstObject() else {
         return Err(anyhow!("SCK: no displays"));
     };
 
@@ -259,11 +267,11 @@ unsafe fn sck_run(tx: mpsc::SyncSender<Vec<f32>>) -> Result<()> {
 
     let stream =
         SCStream::initWithFilter_configuration_delegate(SCStream::alloc(), &filter, &sck_cfg, None);
-    let output = StreamOutput::new(tx);
+    let output = ProtocolObject::from_retained(StreamOutput::new(tx));
     let queue = dispatch2::DispatchQueue::new("baffle-audio", None);
     stream
         .addStreamOutput_type_sampleHandlerQueue_error(
-            ProtocolObject::from_retained(output),
+            &output,
             SCStreamOutputType::Audio,
             Some(&queue),
         )

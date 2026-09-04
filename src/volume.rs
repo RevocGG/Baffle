@@ -38,7 +38,7 @@ pub fn run_tray(cfg: Arc<RwLock<Config>>) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-mod mac_tray_state {
+pub(crate) mod mac_tray_state {
     use super::set_enabled;
     use anyhow::Result;
     use parking_lot::RwLock;
@@ -94,7 +94,8 @@ mod mac_tray_state {
     /// Called from the UI loop each frame (main thread).
     pub fn poll_menu_events() {
         TRAY.with(|slot| {
-            let Some(state) = slot.borrow().as_ref() else {
+            let tray = slot.borrow();
+            let Some(state) = tray.as_ref() else {
                 return;
             };
             while let Ok(ev) = tray_icon::menu::MenuEvent::receiver().try_recv() {
